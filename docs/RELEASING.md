@@ -185,6 +185,12 @@ validated runtime to continue. Session cache aggregation lives in the local TUI
 and reads persisted messages through the adapter, so upstream minifier symbol
 changes do not affect it.
 
+`app-server-standalone-auth` is required. It enables local CLI credentials by
+default while preserving explicit Host authentication. Missing or ambiguous
+protocol anchors and partial auth injections stop synchronization; a release
+must not silently lose account-backed app-server turns. Runtime tests exercise
+both credential owners against a local HTTPS model fixture.
+
 If a required compatibility check fails, synchronization writes JSON and
 Markdown reports under `.release/`. The scheduled workflow uploads both files
 and creates or updates the fixed **Automated upstream runtime compatibility

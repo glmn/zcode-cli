@@ -14,6 +14,8 @@ import {
 } from "../src/runtime-capabilities.ts";
 import { parseReleaseVersion, syncedReleaseVersion } from "./release-version.ts";
 import { markRuntimeModified } from "./runtime-attribution.ts";
+import { hasRuntimeAppServerStandaloneAuth, patchRuntimeAppServerStandaloneAuth } from "./runtime-app-server-patches.ts";
+export { hasRuntimeAppServerStandaloneAuth, patchRuntimeAppServerStandaloneAuth } from "./runtime-app-server-patches.ts";
 import {
   hasRuntimeSqliteBusyTimeout, hasRuntimeSqliteWriteRecovery,
   patchRuntimeSqliteBusyTimeout, patchRuntimeSqliteWriteRecovery
@@ -1650,6 +1652,12 @@ export const runtimePatchPlan: readonly RuntimePatchDefinition[] = [
     requirement: "required",
     apply: patchRuntimeCliHelpContract,
     verify: hasRuntimeCliHelpContract
+  },
+  {
+    id: "app-server-standalone-auth",
+    requirement: "required",
+    apply: patchRuntimeAppServerStandaloneAuth,
+    verify: hasRuntimeAppServerStandaloneAuth
   }
 ];
 

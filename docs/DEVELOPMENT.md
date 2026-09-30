@@ -156,6 +156,23 @@ add these operations to the minified runtime bridge. The TUI queries
 `plugins/referenceCatalog` through the same client and inserts native
 `plugin://` links for `@` Plugin completion.
 
+App-server auth selects one credential owner at startup through
+`src/app-server-auth.ts`: `standalone` by default, or explicit
+`ZCODE_APP_SERVER_AUTH_MODE=host`. The native registry owns credential storage
+and refresh; host mode retains the native account-update and request-auth RPCs.
+`scripts/runtime-app-server-patches.ts` uses Acorn to parse the exported protocol
+agent function, links its registry startup to the ready event and app factory,
+and injects registry options plus the registry's auth port. Unrelated functions,
+partial patches, mismatched registries and ambiguous anchors cannot satisfy its
+verification. Acorn is a synchronization-time development dependency.
+
+Run `bun test test/app-server-auth.test.ts test/runtime-app-server-patches.test.ts`
+for mode selection and patch regression tests. After synchronization, run
+`bun test test/runtime/app-server-auth.test.ts` for real protocol turns against
+a local HTTPS model server: local login, credential rotation, host account
+updates and auth callbacks, missing credentials and invalid modes. Tests use
+temporary homes, fake credentials and a test-only loopback certificate.
+
 Browser automation is enabled by the launcher only for agent-producing
 invocations:
 
