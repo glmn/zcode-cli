@@ -371,14 +371,28 @@ function changedWords(hunk: FileDiffHunk, theme: ZCodeTheme, filePath: string): 
 }
 
 export class FileDiffView implements Component {
+  private cachedLines?: string[];
+  private cachedWidth?: number;
+
   constructor(
     private readonly theme: ZCodeTheme,
     private readonly options: FileDiffViewOptions
   ) {}
 
-  invalidate(): void {}
+  invalidate(): void {
+    this.cachedLines = undefined;
+    this.cachedWidth = undefined;
+  }
 
   render(width: number): string[] {
+    if (this.cachedLines && this.cachedWidth === width) return this.cachedLines;
+    const lines = this.renderDiff(width);
+    this.cachedLines = lines;
+    this.cachedWidth = width;
+    return lines;
+  }
+
+  private renderDiff(width: number): string[] {
     const output: string[] = [];
     const diffs = this.options.expanded ? this.options.diffs : this.options.diffs.slice(0, maxVisibleFiles);
     const digits = Math.max(2, String(maximumLineNumber(diffs)).length);

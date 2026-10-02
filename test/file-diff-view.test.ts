@@ -161,6 +161,36 @@ describe("TUI file diff view", () => {
     expect(lines.every((line) => visibleWidth(line) <= 28)).toBe(true);
   });
 
+  test("caches repeated renders at the same width until invalidated", () => {
+    const view = new FileDiffView(createTheme(false), {
+      toolName: "Edit",
+      state: "complete",
+      diffs: [{
+        filePath: "src/app.ts",
+        additions: 1,
+        deletions: 1,
+        structuredPatch: [{
+          oldStart: 1,
+          oldLines: 1,
+          newStart: 1,
+          newLines: 1,
+          lines: ["-const value = 1;", "+const value = 2;"]
+        }]
+      }]
+    });
+
+    const first = view.render(80);
+    expect(view.render(80)).toBe(first);
+
+    const wider = view.render(120);
+    expect(wider).not.toBe(first);
+    expect(view.render(120)).toBe(wider);
+    expect(view.render(120).join("\n")).toContain("src/app.ts");
+
+    view.invalidate();
+    expect(view.render(120)).not.toBe(wider);
+  });
+
   test("bounds very large diffs", () => {
     const lines = Array.from({ length: 200 }, (_, index) => `+line ${index + 1}`);
     const card = fileDiffCard({
