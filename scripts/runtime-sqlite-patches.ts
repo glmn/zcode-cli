@@ -2,6 +2,7 @@ export const sqliteBusyTimeoutMs = 10_000;
 
 const pragma = `pragma busy_timeout = ${sqliteBusyTimeoutMs}`;
 const helper = 'require(require("node:path").join(__dirname,"cli-config.cjs"))';
+const wasiJournalFallback = '&&!(process.platform==="wasi"&&w==="delete")';
 const identifier = "[A-Za-z_$][\\w$]*";
 const boundedIdentifier = "[A-Za-z_$][\\w$]{0,80}";
 
@@ -11,6 +12,23 @@ function escape(value: string): string {
 
 function count(source: string, pattern: RegExp): number {
   return [...source.matchAll(pattern)].length;
+}
+
+export function hasRuntimeSqliteWasiJournalFallback(runtime: string): boolean {
+  return runtime.includes(wasiJournalFallback);
+}
+
+export function patchRuntimeSqliteWasiJournalFallback(runtime: string): string {
+  if (hasRuntimeSqliteWasiJournalFallback(runtime)) return runtime;
+  const anchor = 'if(w!=="wal"&&!kwr(t,w))throw';
+  if (count(runtime, new RegExp(escape(anchor), "gu")) !== 1) {
+    throw new Error("ZCode runtime is incompatible with the WASI SQLite journal fallback patch.");
+  }
+  const patched = runtime.replace(anchor, `if(w!=="wal"&&!kwr(t,w)${wasiJournalFallback})throw`);
+  if (!hasRuntimeSqliteWasiJournalFallback(patched)) {
+    throw new Error("WASI SQLite journal fallback patch failed postcondition verification.");
+  }
+  return patched;
 }
 
 /** Both open paths must retain their steady-state timeout after migration. */

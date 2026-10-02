@@ -18,11 +18,14 @@ import { hasRuntimeAppServerStandaloneAuth, patchRuntimeAppServerStandaloneAuth 
 export { hasRuntimeAppServerStandaloneAuth, patchRuntimeAppServerStandaloneAuth } from "./runtime-app-server-patches.ts";
 import {
   hasRuntimeSqliteBusyTimeout, hasRuntimeSqliteWriteRecovery,
-  patchRuntimeSqliteBusyTimeout, patchRuntimeSqliteWriteRecovery
+  hasRuntimeSqliteWasiJournalFallback, patchRuntimeSqliteBusyTimeout,
+  patchRuntimeSqliteWasiJournalFallback, patchRuntimeSqliteWriteRecovery
 } from "./runtime-sqlite-patches.ts";
 export {
   hasRuntimeSqliteBusyTimeout, hasRuntimeSqliteWriteRecovery,
-  patchRuntimeSqliteBusyTimeout, patchRuntimeSqliteWriteRecovery, sqliteBusyTimeoutMs
+  hasRuntimeSqliteWasiJournalFallback, patchRuntimeSqliteBusyTimeout,
+  patchRuntimeSqliteWasiJournalFallback, patchRuntimeSqliteWriteRecovery,
+  sqliteBusyTimeoutMs
 } from "./runtime-sqlite-patches.ts";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -1623,6 +1626,12 @@ export const runtimePatchPlan: readonly RuntimePatchDefinition[] = [
     requirement: "required",
     apply: patchRuntimeSqliteBusyTimeout,
     verify: hasRuntimeSqliteBusyTimeout
+  },
+  {
+    id: "sqlite-wasi-journal-fallback",
+    requirement: "required",
+    apply: patchRuntimeSqliteWasiJournalFallback,
+    verify: hasRuntimeSqliteWasiJournalFallback
   },
   {
     id: "sqlite-write-recovery",

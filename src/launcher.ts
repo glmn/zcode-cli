@@ -50,6 +50,10 @@ const tuiRuntimeLogLimitBytes = 2 * 1024 * 1024;
 const versionArguments = new Set(["version", "--version", "-v"]);
 const runtimeVariadicOptions = new Set(["--disallowedTools", "--disallowed-tools"]);
 
+function environmentFlagEnabled(value: string | undefined): boolean {
+  return value !== undefined && !["", "0", "false", "no", "off"].includes(value.trim().toLowerCase());
+}
+
 
 export function resolveModelRetryMaxRetries(env: NodeJS.ProcessEnv): string {
   return env.ZCODE_MODEL_RETRY_MAX_RETRIES?.trim() || defaultModelRetryMaxRetries;
@@ -252,6 +256,7 @@ export function withDefaultBrowserUse(
   args: string[],
   runtimeOptionTypes = readRuntimeCliOptionTypes()
 ): string[] {
+  if ((process.platform as string) === "wasi" || environmentFlagEnabled(process.env.ZCODE_DISABLE_BROWSER_USE)) return args;
   const invocation = inspectRuntimeInvocation(args, runtimeOptionTypes);
   if (invocation.explicitBrowserUse
     || invocation.passthrough

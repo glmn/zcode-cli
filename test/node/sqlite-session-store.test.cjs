@@ -16,7 +16,8 @@ test("real runtime keeps the write timeout after sync open, async startup and re
       const store = await Store.openStartup({ dbPath });
       try {
         assert.equal(store.db.prepare("PRAGMA busy_timeout").get().timeout, 10_000);
-        assert.equal(store.db.prepare("PRAGMA journal_mode").get().journal_mode, "wal");
+        assert.equal(store.db.prepare("PRAGMA journal_mode").get().journal_mode,
+          process.platform === "wasi" ? "delete" : "wal");
         t.diagnostic(`Node ${process.version}; SQLite ${store.db.prepare("SELECT sqlite_version() AS version").get().version}; busy_timeout=10000`);
       } finally { store.close(); }
     }
