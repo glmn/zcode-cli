@@ -1494,6 +1494,7 @@ class ZCodeTui {
       }
       if (matchesKey(data, "ctrl+f")) {
         this.editor.setText("/search ");
+        this.ui.requestRender();
         return { consume: true };
       }
       if (matchesKey(data, "shift+tab")) {
@@ -1522,6 +1523,7 @@ class ZCodeTui {
       if (matchesKey(data, "ctrl+c")) {
         if (this.editor.getText()) {
           this.editor.setText("");
+          this.ui.requestRender();
         } else if (this.turnAbortController) {
           this.pendingSteerInterrupt = undefined;
           this.turnAbortController.abort();

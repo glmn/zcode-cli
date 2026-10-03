@@ -84,3 +84,30 @@ test("resuming queued text preserves an image attached afterwards for the editor
   await session.assertScreenExcludes("sent image leaves editor", /\[Image #1\]/u);
   await session.exit();
 }, 20_000);
+
+test("ctrl+c clears the editor text on screen without waiting for the next keypress", async () => {
+  await using workspace = await ScenarioWorkspace.create({ prefix: "zcode-input-clear-" });
+  await using session = TerminalSession.start({ command: [process.execPath, join(import.meta.dir, "fixtures/input-actions.ts")], workspace });
+  await session.waitForScreen("ready", /Original answer/u);
+  session.send("stale draft");
+  await session.waitForScreen("draft visible", /stale draft/u);
+  session.send("\x03");
+  await session.settle();
+  await session.assertScreenExcludes("cleared draft no longer visible", /stale draft/u);
+  await session.exit();
+}, 20_000);
+
+test("ctrl+f replaces editor text with the /search prefill on screen", async () => {
+  await using workspace = await ScenarioWorkspace.create({ prefix: "zcode-input-search-" });
+  await using session = TerminalSession.start({ command: [process.execPath, join(import.meta.dir, "fixtures/input-actions.ts")], workspace });
+  await session.waitForScreen("ready", /Original answer/u);
+  session.send("stale draft");
+  await session.waitForScreen("draft visible", /stale draft/u);
+  session.send("\x06");
+  await session.settle();
+  await session.assertScreenExcludes("replaced draft no longer visible", /stale draft/u);
+  await session.waitForScreen("search prefill visible", /\/search/u);
+  session.send("\x03");
+  await session.settle();
+  await session.exit();
+}, 20_000);
