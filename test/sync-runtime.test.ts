@@ -26,6 +26,7 @@ import {
   patchRuntimeAgentAutoBackground,
   patchRuntimeCliHelpContract,
   patchRuntimeCliCredentials,
+  patchRuntimeCliSettingsFile,
   patchRuntimeDetachedAgentLifecycle,
   patchRuntimeGoalFailurePause,
   patchRuntimeHttpNoContent,
@@ -49,6 +50,43 @@ import {
   supportsMultiMessageFileRewind,
   writeRuntimeCompatibilityFailure
 } from "../scripts/sync-runtime.ts";
+
+describe("CLI settings file override", () => {
+  // The shapes of the runtime's settings loader and settings path getter after the shared-config patch.
+  const source = 'var F="setting.json",B="~/.zcode/cli";'
+    + 'function resolvePath(e){return e.startsWith("~/")?(0,P.join)("/home/u",e.slice(2)):e}'
+    + 'function load(e,t={}){let n=e?resolvePath(e):(0,P.join)(resolvePath(t.baseDir??B),t.configFileName??F);return n}'
+    + 'function settingsPath(){return(0,P.join)(resolvePath(B),F)}';
+
+  function runtime(env: Record<string, string>) {
+    const patched = patchRuntimeCliSettingsFile(source);
+    const P = { join: (...parts: string[]) => parts.join("/") };
+    const require = (id: string) => {
+      if (id !== "node:path") throw new Error(id);
+      return { resolve: (value: string) => `resolved:${value}` };
+    };
+    return new Function("P", "require", "process", `${patched};return {load,settingsPath}`)(P, require, { env });
+  }
+
+  test("uses ZCODE_CLI_SETTINGS_FILE for the default settings file only", () => {
+    const patched = patchRuntimeCliSettingsFile(source);
+    expect(patchRuntimeCliSettingsFile(patched)).toBe(patched);
+
+    const plain = runtime({});
+    expect(plain.load()).toBe("/home/u/.zcode/cli/setting.json");
+    expect(plain.settingsPath()).toBe("/home/u/.zcode/cli/setting.json");
+
+    const host = runtime({ ZCODE_CLI_SETTINGS_FILE: " /host/card/setting.json " });
+    expect(host.load()).toBe("resolved:/host/card/setting.json");
+    expect(host.settingsPath()).toBe("resolved:/host/card/setting.json");
+    expect(host.load("/explicit.json")).toBe("/explicit.json");
+    expect(host.load(undefined, { baseDir: "/project/.zcode", configFileName: "config.json" })).toBe("/project/.zcode/config.json");
+  });
+
+  test("refuses a runtime without the settings path anchors", () => {
+    expect(() => patchRuntimeCliSettingsFile("incompatible runtime")).toThrow(/settings path patch/);
+  });
+});
 
 describe("CLI credential isolation", () => {
   test("keeps explicit paths first and isolates environment-selected credentials", () => {

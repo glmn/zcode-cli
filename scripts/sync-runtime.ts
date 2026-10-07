@@ -1386,6 +1386,31 @@ export function patchRuntimePromptModel(runtime: string): string {
     + runtime.slice(anchor.index);
 }
 
+/** Lets `ZCODE_CLI_SETTINGS_FILE` replace the default `~/.zcode/cli/setting.json` (explicit paths still win). */
+export function patchRuntimeCliSettingsFile(runtime: string): string {
+  const marker = "ZCODE_CLI_SETTINGS_FILE";
+  if (runtime.includes(marker)) return runtime;
+  const names = /([A-Za-z_$][\w$]*)="setting\.json",([A-Za-z_$][\w$]*)="~\/\.zcode\/cli"/u.exec(runtime);
+  const file = names && escapeRegExpName(names[1]!), base = names && escapeRegExpName(names[2]!);
+  const loader = names && new RegExp(
+    `\\(0,([A-Za-z_$][\\w$]*)\\.join\\)\\(([A-Za-z_$][\\w$]*)\\(([A-Za-z_$][\\w$]*)\\.baseDir\\?\\?${base}\\),\\3\\.configFileName\\?\\?${file}\\)`,
+    "u"
+  ).exec(runtime);
+  const getter = names && new RegExp(
+    `function ([A-Za-z_$][\\w$]*)\\(\\)\\{return\\(0,([A-Za-z_$][\\w$]*)\\.join\\)\\(([A-Za-z_$][\\w$]*)\\(${base}\\),${file}\\)\\}`,
+    "u"
+  ).exec(runtime);
+  if (!names || !loader || !getter) {
+    throw new Error("ZCode runtime is incompatible with the CLI settings path patch.");
+  }
+  const override = `process.env.${marker}?.trim()`;
+  const resolved = `require("node:path").resolve(${override})`;
+  const options = loader[3]!;
+  return runtime
+    .replace(loader[0], `(${options}.baseDir===void 0&&${options}.configFileName===void 0&&${override}?${resolved}:${loader[0]})`)
+    .replace(getter[0], `function ${getter[1]}(){return ${override}?${resolved}:(0,${getter[2]}.join)(${getter[3]}(${names[2]}),${names[1]})}`);
+}
+
 export function patchRuntimeCliCredentials(runtime: string): string {
   const marker = 'ZCODE_CLI_CREDENTIALS_FILE';
   if (runtime.includes(marker)) return runtime;
@@ -1575,6 +1600,12 @@ export const runtimePatchPlan: readonly RuntimePatchDefinition[] = [
     requirement: "required",
     apply: patchRuntimeSharedConfig,
     verify: runtime => runtime.includes('ZCODE_CLI_MIGRATE_CONFIG==="1"') && runtime.includes('="setting.json",')
+  },
+  {
+    id: "cli-settings-file",
+    requirement: "required",
+    apply: patchRuntimeCliSettingsFile,
+    verify: (runtime) => runtime.includes("ZCODE_CLI_SETTINGS_FILE")
   },
   {
     id: "configuration-diagnostics", requirement: "required", apply: patchRuntimeConfigurationDiagnostics,

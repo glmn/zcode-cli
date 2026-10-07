@@ -8,6 +8,7 @@ import {
   readConfiguredModelAccess,
   cliSettingsPath
 } from "../src/model-access.ts";
+import { desktopSettingsPath } from "../src/config-paths.ts";
 
 const temporaryDirectories: string[] = [];
 
@@ -38,6 +39,18 @@ describe("user config bootstrap", () => {
     expect(cliSettingsPath({}, "win32", "D:\\Profiles\\Default")).toBe(
       "D:\\Profiles\\Default\\.zcode\\cli\\setting.json"
     );
+  });
+
+  test("lets a host choose the settings file without moving Desktop settings", async () => {
+    const home = await temporaryHome();
+    const hostFile = join(home, "host", "card", "setting.json");
+    const env = { ...homeEnvironment(home), ZCODE_CLI_SETTINGS_FILE: ` ${hostFile} ` };
+
+    expect(cliSettingsPath(env)).toBe(hostFile);
+    expect(desktopSettingsPath(env)).toBe(join(home, ".zcode", "v2", "setting.json"));
+    expect(await ensureCliSettings(env)).toEqual({ configPath: hostFile, created: true });
+    expect(JSON.parse(await readFile(hostFile, "utf8"))).toBeObject();
+    await expect(stat(join(home, ".zcode", "cli", "setting.json"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   test("recursively creates a private, credential-free config", async () => {

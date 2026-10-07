@@ -76,6 +76,7 @@ The following variables are supported host integration points:
 | `ZCODE_BASE_URL` | Override the official ZCode service base URL. |
 | `ZCODE_MODEL_RETRY_MAX_RETRIES` | Override the model retry limit. |
 | `ZCODE_TUI_RUNTIME_LOG` | Choose the bounded diagnostic log for TUI runtime stderr. |
+| `ZCODE_CLI_SETTINGS_FILE` | Use this settings file (absolute path) instead of `~/.zcode/cli/setting.json`, e.g. to give one process its own hooks, MCP servers and permissions without editing the user's file. Migration markers are kept next to it. |
 
 Hosts should pass user configuration through the normal ZCode environment and
 configuration files. Do not put API keys or other secrets in command-line
