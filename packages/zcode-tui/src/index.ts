@@ -109,7 +109,7 @@ import {
   type UserQuestion
 } from "./interactions.ts";
 import { PermissionPreview } from "./permission-view.ts";
-import { PermissionRequestQueue } from "./permission-request-queue.ts";
+import { PermissionRequestQueue, permissionRequestSignal } from "./permission-request-queue.ts";
 import { createRuntimePluginReferenceLister } from "./plugin-references.ts";
 import {
   formatWorkflowPanel,
@@ -3546,10 +3546,7 @@ class ZCodeTui {
   }
 
   private requestPermission(requestValue: unknown, context?: unknown): Promise<unknown> {
-    const contextRecord = isRecord(context) ? context : undefined;
-    const signal = contextRecord?.abortSignal instanceof AbortSignal
-      ? contextRecord.abortSignal
-      : this.turnAbortController?.signal;
+    const signal = permissionRequestSignal(context) ?? this.turnAbortController?.signal;
     return this.permissionRequests.run(
       () => this.requestPermissionUnqueued(requestValue, signal)
     );
@@ -3574,7 +3571,11 @@ class ZCodeTui {
       response = await this.requestToolPermission(request, toolName, signal);
     }
 
-    if (tool) {
+    // The runtime aborts a request's signal when another responder (a
+    // PermissionRequest hook) settled it first. That decision is not this
+    // dialog's to report: the runtime's own tool events update the view.
+    const settledElsewhere = signal?.aborted === true && this.turnAbortController?.signal.aborted !== true;
+    if (tool && !settledElsewhere) {
       const record = isRecord(response) ? response : undefined;
       const decision = asString(record?.decision)?.toLowerCase();
       const allowed = decision === "allow" || decision === "modify";
