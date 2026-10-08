@@ -3553,6 +3553,10 @@ class ZCodeTui {
   }
 
   private async requestPermissionUnqueued(requestValue: unknown, signal?: AbortSignal): Promise<unknown> {
+    // A hook may have settled this request while it waited in the queue.
+    // Preserve any tool state the runtime already reported for it.
+    if (signal?.aborted) return { decision: "deny", reason: "Permission request cancelled" };
+
     const request = isRecord(requestValue) ? requestValue : {};
     const toolName = asString(request.toolName) ?? "tool";
     const asksUserQuestion = isAskUserQuestionTool(toolName);
