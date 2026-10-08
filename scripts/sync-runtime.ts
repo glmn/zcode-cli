@@ -1386,10 +1386,20 @@ export function patchRuntimePromptModel(runtime: string): string {
     + runtime.slice(anchor.index);
 }
 
-/** Lets `ZCODE_CLI_SETTINGS_FILE` replace the default `~/.zcode/cli/setting.json` (explicit paths still win). */
+const cliSettingsOverride = "process.env.ZCODE_CLI_SETTINGS_FILE?.trim()";
+const resolvedCliSettingsOverride = `require("node:path").resolve(${cliSettingsOverride})`;
+const cliSettingsLoaderMarker = `.configFileName===void 0&&${cliSettingsOverride}?${resolvedCliSettingsOverride}:`;
+const cliSettingsGetterMarker = `(){return ${cliSettingsOverride}?${resolvedCliSettingsOverride}:`;
+const cliSettingsTrustMarker = `.userConfigPath??(${cliSettingsOverride}||`;
+
+export function hasRuntimeCliSettingsFile(runtime: string): boolean {
+  return [cliSettingsLoaderMarker, cliSettingsGetterMarker, cliSettingsTrustMarker]
+    .every(marker => runtime.includes(marker));
+}
+
+/** Redirect settings reads, writes and hook trust storage together; explicit paths still win. */
 export function patchRuntimeCliSettingsFile(runtime: string): string {
-  const marker = "ZCODE_CLI_SETTINGS_FILE";
-  if (runtime.includes(marker)) return runtime;
+  if (hasRuntimeCliSettingsFile(runtime)) return runtime;
   const names = /([A-Za-z_$][\w$]*)="setting\.json",([A-Za-z_$][\w$]*)="~\/\.zcode\/cli"/u.exec(runtime);
   const file = names && escapeRegExpName(names[1]!), base = names && escapeRegExpName(names[2]!);
   const loader = names && new RegExp(
@@ -1400,15 +1410,27 @@ export function patchRuntimeCliSettingsFile(runtime: string): string {
     `function ([A-Za-z_$][\\w$]*)\\(\\)\\{return\\(0,([A-Za-z_$][\\w$]*)\\.join\\)\\(([A-Za-z_$][\\w$]*)\\(${base}\\),${file}\\)\\}`,
     "u"
   ).exec(runtime);
-  if (!names || !loader || !getter) {
+  if (!names || !loader || (!getter && !runtime.includes(cliSettingsGetterMarker))) {
     throw new Error("ZCode runtime is incompatible with the CLI settings path patch.");
   }
-  const override = `process.env.${marker}?.trim()`;
-  const resolved = `require("node:path").resolve(${override})`;
   const options = loader[3]!;
-  return runtime
-    .replace(loader[0], `(${options}.baseDir===void 0&&${options}.configFileName===void 0&&${override}?${resolved}:${loader[0]})`)
-    .replace(getter[0], `function ${getter[1]}(){return ${override}?${resolved}:(0,${getter[2]}.join)(${getter[3]}(${names[2]}),${names[1]})}`);
+  if (!runtime.includes(cliSettingsLoaderMarker)) {
+    runtime = runtime.replace(loader[0], () => `(${options}.baseDir===void 0&&${options}.configFileName===void 0&&${cliSettingsOverride}?${resolvedCliSettingsOverride}:${loader[0]})`);
+  }
+  if (getter && !runtime.includes(cliSettingsGetterMarker)) {
+    runtime = runtime.replace(getter[0], () => `function ${getter[1]}(){return ${cliSettingsOverride}?${resolvedCliSettingsOverride}:(0,${getter[2]}.join)(${getter[3]}(${names[2]}),${names[1]})}`);
+  }
+  // The trust commands resolve storage.dir independently of loadFileConfig.
+  // Without this patch, grants can go to a different store than the app runtime reads.
+  if (!runtime.includes(cliSettingsTrustMarker)) {
+    const trustPaths = [...runtime.matchAll(/([A-Za-z_$][\w$]*)\.userConfigPath\?\?(\(0,[A-Za-z_$][\w$]*\.join\)\([A-Za-z_$][\w$]*,"\.zcode","cli","config\.json"\))/gu)];
+    if (trustPaths.length !== 1) {
+      throw new Error("ZCode runtime is incompatible with the CLI settings path patch (hook trust anchor missing or ambiguous).");
+    }
+    const trust = trustPaths[0]!;
+    runtime = runtime.replace(trust[0], () => `${trust[1]}.userConfigPath??(${cliSettingsOverride}||${trust[2]})`);
+  }
+  return runtime;
 }
 
 export function patchRuntimeCliCredentials(runtime: string): string {
@@ -1605,7 +1627,7 @@ export const runtimePatchPlan: readonly RuntimePatchDefinition[] = [
     id: "cli-settings-file",
     requirement: "required",
     apply: patchRuntimeCliSettingsFile,
-    verify: (runtime) => runtime.includes("ZCODE_CLI_SETTINGS_FILE")
+    verify: hasRuntimeCliSettingsFile
   },
   {
     id: "configuration-diagnostics", requirement: "required", apply: patchRuntimeConfigurationDiagnostics,
